@@ -2,3 +2,11 @@ language: node_js
 node_js:
   - '6'
 script: npm test
+deploy:
+  provider: npm
+  email: jmsmyth@users.noreply.github.com
+  api_key:
+    secure: SjcnJPZEGMGiF2Sg4E7+jG2TYaeYbE8QIkMdIjyuW/np6hmBqXzBvGeInzGQi9PYZzEInzp2INYS6IwlBWeiSEkEKygWW11+z0pDt6jw2KxatNM2Zyc6YIZUmIhe8FcYw5PIx9svNSAb8NOLMtBwD4ao1uKXIRJuGxLGfb56gkoFdycp2NGhDis6rH6GjeaWugHJiNXuepVUiCf/PM52v+bvXiskFemL30zdcQ+PyfLeEZqm/6NOslRUlBMAk+cztxavLKVTxxsXrfF2+axnFaxKR+y/na3HaXagzFLfN3HNvwHcW5r4fDgZmg4Y0hiKn6boMPycu6+JeJWFI809pHJIoC35mDVQykzVDqKLtnpfG2Hbq1QFbDwBk3qkNjE/tWxQ1ywA6rbK3XBwuTX/9oSIKfyMfahEEwXb4QIWGe0BAHd8go65RkE4vRg34jDMhQu3FWGZPRD/cvwF+ksAdSkN/zmL9KBjKqnISMfnRxYhnA1lcSrBy51eJqeFlBYPw8LkzROrYDhOFAy56tbnvY2gt9j3T4yNlBqI11w5OGenKcgXmIzpOqP0zdEv9IuNgaje9UeZsOe9eUWIceoH866enVvDHUM1UbvE7DiKJziJewoaY1iwMEZO64+Ci2RPwVYHr1usn3CHP2tY/YpLrgqhzpKNUk4i+5Aj9oCQ+VA=
+  on:
+    tags: true
+    repo: jmsmyth/hexagon-rx

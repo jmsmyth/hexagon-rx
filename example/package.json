@@ -1,0 +1,21 @@
+{
+  "name": "hexagon-rx-example",
+  "version": "0.1.0",
+  "description": "Reactive super powers for hexagon-js",
+  "author": "James Smyth <jmsmyth@users.noreply.github.com>",
+  "license": "MIT",
+  "scripts": {
+    "start": "npm-run-all --parallel start:*",
+    "start:build": "rollup -w -c rollup.config.js",
+    "start:server": "live-server ."
+  },
+  "private": true,
+  "devDependencies": {
+    "live-server": "^1.2.0",
+    "npm-run-all": "^4.0.1",
+    "rollup": "^0.41.4",
+    "rollup-plugin-buble": "^0.15.0",
+    "rollup-watch": "^3.2.2",
+    "hexagon-js": "^1.10.0"
+  }
+}

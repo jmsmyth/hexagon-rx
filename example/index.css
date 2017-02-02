@@ -1,0 +1,17 @@
+.group {
+  display: flex;
+  flex-direction: column;
+  border: solid 1px rgba(0, 0, 0, 0.05);
+}
+
+.person {
+  border: solid 1px rgba(0, 0, 0, 0.05);
+  background: white;
+  margin: 8px;
+}
+
+.person-name,
+.person-age {
+  border-bottom: solid 1px rgba(0, 0, 0, 0.05);
+  padding: 8px;
+}

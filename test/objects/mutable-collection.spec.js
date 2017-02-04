@@ -68,6 +68,12 @@ describe('mutableCollection', () => {
     ])
   })
 
+  it('should be able to get a specific value', () => {
+    const PointList = mutableCollection(Point, { default: () => [{id: 0, x: 5, y: 4}, {id: 1, x: 3, y: 10}] })
+    const instance = new PointList()
+    instance.get(0).should.eql(new Point({id: 0, x: 5, y: 4}))
+  })
+
   it('should be able to set the values and should emit events', () => {
     const PointList = mutableCollection(Point)
     const instance = new PointList()

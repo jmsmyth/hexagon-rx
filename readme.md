@@ -1,6 +1,6 @@
 # hexagon-rx
 
-[wip] Adds reactive powers to hexagon-js
+Adds reactive powers to hexagon-js
 
 ## Example
 

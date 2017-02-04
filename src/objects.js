@@ -92,11 +92,19 @@ export function constantCollection (Type, options = {}) {
       super()
       const initialValue = values || defaultValue() || []
       this.values = initialValue.map(v => new Type(v))
+      this.map = new Map
+      this.values.forEach(v => {
+        this.map.set(v.id, v)
+      })
       this.serializable = serializable
     }
 
-    get () {
-      return this.values
+    get (id) {
+      if (arguments.length > 0) {
+        return this.map.get(id)
+      } else {
+        return this.values
+      }
     }
 
     set () {

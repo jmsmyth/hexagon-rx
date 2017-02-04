@@ -1,4 +1,10 @@
-import hx from 'hexagon-js';
+(function (global, factory) {
+	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('hexagon-js')) :
+	typeof define === 'function' && define.amd ? define(['exports', 'hexagon-js'], factory) :
+	(factory((global.rx = global.rx || {}),global.window.hx));
+}(this, (function (exports,hx) { 'use strict';
+
+hx = 'default' in hx ? hx['default'] : hx;
 
 function isFunction (x) {
   return typeof x === "function";
@@ -460,4 +466,12 @@ Collection.prototype.div = function (cls, component) {
   return selection
 };
 
-export { constant, mutable, constantCollection, mutableCollection, object };
+exports.constant = constant;
+exports.mutable = mutable;
+exports.constantCollection = constantCollection;
+exports.mutableCollection = mutableCollection;
+exports.object = object;
+
+Object.defineProperty(exports, '__esModule', { value: true });
+
+})));

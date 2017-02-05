@@ -50,13 +50,13 @@ function isPrimitiveType (x) {
 function defaultForPrimitiveType (Type) {
   if (Type === Boolean) { return false }
   if (Type === Number) { return 0 }
-  if (Type === String) { return "" }
+  if (Type === String) { return '' }
 }
 
 function typeFactory (Type) {
   return isPrimitiveType(Type) ?
     function (x) { return x ? x : defaultForPrimitiveType(Type); } :
-    function (x) { return x ? new Type(x) : new Type; }
+    function (x) { return x ? new Type(x) : new Type(); }
 }
 
 var Observable = (function (EventEmitter$$1) {
@@ -97,7 +97,7 @@ function constant (Type, options) {
   if ( options === void 0 ) options = {};
 
   var defaultValue = isFunction(options.default) ? options.default : function () { return options.default; };
-  var serializable = !!options.serializable;
+  var serializable = options.serializable !== false;
   var create = typeFactory(Type);
 
   return (function (Value) {
@@ -120,7 +120,11 @@ function constant (Type, options) {
     };
 
     Constant.prototype.serialize = function serialize () {
-      return this.value
+      if (serializable) {
+        return this.value
+      } else {
+        throw new Error('This object is not serializable')
+      }
     };
 
     return Constant;
@@ -131,7 +135,7 @@ function mutable (Type, options) {
   if ( options === void 0 ) options = {};
 
   var defaultValue = isFunction(options.default) ? options.default : function () { return options.default; };
-  var serializable = !!options.serializable;
+  var serializable = options.serializable !== false;
   var create = typeFactory(Type);
 
   return (function (Value) {
@@ -153,17 +157,21 @@ function mutable (Type, options) {
       if (this.value !== value) {
         this.value = value;
         this.emit('change', value);
+        if (serializable) { this.emit('serializable-change', value); }
       }
     };
 
     Mutable.prototype.serialize = function serialize () {
-      return this.value
+      if (serializable) {
+        return this.value
+      } else {
+        throw new Error('This object is not serializable')
+      }
     };
 
     return Mutable;
   }(Value))
 }
-
 
 function constantCollection (Type, options) {
   if ( options === void 0 ) options = {};
@@ -173,7 +181,7 @@ function constantCollection (Type, options) {
   }
 
   var defaultValue = isFunction(options.default) ? options.default : function () { return options.default; };
-  var serializable = !!options.serializable;
+  var serializable = options.serializable !== false;
 
   return (function (Collection) {
     function ConstantCollection (values) {
@@ -182,7 +190,7 @@ function constantCollection (Type, options) {
       Collection.call(this);
       var initialValue = values || defaultValue() || [];
       this.values = initialValue.map(function (v) { return new Type(v); });
-      this.map = new Map;
+      this.map = new Map();
       this.values.forEach(function (v) {
         this$1.map.set(v.id, v);
       });
@@ -214,7 +222,11 @@ function constantCollection (Type, options) {
     };
 
     ConstantCollection.prototype.serialize = function serialize () {
-      return this.values.map(function (v) { return v.serialize(); })
+      if (serializable) {
+        return this.values.map(function (v) { return v.serialize(); })
+      } else {
+        throw new Error('This object is not serializable')
+      }
     };
 
     return ConstantCollection;
@@ -229,25 +241,35 @@ function mutableCollection (Type, options) {
   }
 
   var defaultValue = isFunction(options.default) ? options.default : function () { return options.default; };
-  var serializable = !!options.serializable;
+  var serializable = options.serializable !== false;
 
   return (function (Collection) {
     function MutableCollection (values) {
       var this$1 = this;
 
       Collection.call(this);
-      this.map = new Map;
-      this.listeners = new Map;
+      this.map = new Map();
+      this.listeners = new Map();
+      this.serializableListeners = new Map();
       var initialValue = values || defaultValue() || [];
       initialValue.forEach(function (v) {
         var t = new Type(v);
         var changeListener = function (evt) {
-          this$1.emit('item-change', evt),
+          this$1.emit('item-change', evt);
           this$1.emit('change', this$1);
         };
         t.on('change', changeListener);
         this$1.map.set(t.id, t);
         this$1.listeners.set(t.id, changeListener);
+
+        if (serializable) {
+          var serializableChangeListener = function (evt) {
+            this$1.emit('item-serializable-change', evt);
+            this$1.emit('serializable-change', this$1);
+          };
+          this$1.serializableListeners.set(t.id, serializableChangeListener);
+          t.on('serializable-change', serializableChangeListener);
+        }
       });
       this.serializable = serializable;
     }
@@ -269,7 +291,7 @@ function mutableCollection (Type, options) {
 
       var oldValue = this.get();
       oldValue.forEach(function (obj) { return this$1.listeners.delete(obj.id); });
-      this.map = new Map;
+      this.map = new Map();
       values.forEach(function (v) {
         var changeListener = function (evt) {
           this$1.emit('item-change', evt);
@@ -278,9 +300,22 @@ function mutableCollection (Type, options) {
         v.on('change', changeListener);
         this$1.map.set(v.id, v);
         this$1.listeners.set(v.id, changeListener);
+
+        if (serializable) {
+          var serializableChangeListener = function (evt) {
+            this$1.emit('item-serializable-change', evt);
+            this$1.emit('serializable-change', this$1);
+          };
+          this$1.serializableListeners.set(v.id, serializableChangeListener);
+          v.on('serializable-change', serializableChangeListener);
+        }
       });
       this.emit('set', this);
       this.emit('change', this);
+
+      if (serializable) {
+        this.emit('serializable-change', this);
+      }
     };
 
     MutableCollection.prototype.get = function get (id) {
@@ -294,17 +329,29 @@ function mutableCollection (Type, options) {
     MutableCollection.prototype.add = function add (value) {
       var this$1 = this;
 
-      if (value instanceof Type) {
-        if (!this.map.has(value.id)) {
+      var newValue = value !== undefined ? value : new Type();
+
+      if (newValue instanceof Type) {
+        if (!this.map.has(newValue.id)) {
           var changeListener = function (evt) {
             this$1.emit('item-change', evt);
             this$1.emit('change', this$1);
           };
-          value.on('change', changeListener);
-          this.map.set(value.id, value);
-          this.listeners.set(value.id, changeListener);
-          this.emit('add', value);
+          newValue.on('change', changeListener);
+          this.map.set(newValue.id, newValue);
+          this.listeners.set(newValue.id, changeListener);
+          this.emit('item-add', newValue);
           this.emit('change', this);
+
+          if (serializable) {
+            var serializableChangeListener = function (evt) {
+              this$1.emit('item-serializable-change', evt);
+              this$1.emit('serializable-change', this$1);
+            };
+            this.serializableListeners.set(newValue.id, serializableChangeListener);
+            newValue.on('serializable-change', serializableChangeListener);
+            this.emit('serializable-change', this);
+          }
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
@@ -318,8 +365,15 @@ function mutableCollection (Type, options) {
           oldValue.off('change', this.listeners.get(value.id));
           this.map.delete(value.id);
           this.listeners.delete(value.id);
-          this.emit('remove', value);
+          this.emit('item-remove', value);
           this.emit('change', this);
+
+          if (serializable) {
+            oldValue.off('serializable-change', this.serializableListeners.get(value.id));
+            this.emit('serializable-change', this);
+          }
+
+          oldValue;
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
@@ -327,7 +381,11 @@ function mutableCollection (Type, options) {
     };
 
     MutableCollection.prototype.serialize = function serialize () {
-      return this.get().map(function (v) { return v.serialize(); })
+      if (serializable) {
+        return this.get().map(function (v) { return v.serialize(); })
+      } else {
+        throw new Error('This object is not serializable')
+      }
     };
 
     return MutableCollection;
@@ -357,7 +415,11 @@ var RXObject = (function (Observable) {
   return RXObject;
 }(Observable));
 
-function object (obj) {
+function object (obj, options) {
+  if ( options === void 0 ) options = {};
+
+
+  var serializable = options.serializable !== false;
   var keys = Object.keys(obj);
 
   keys.forEach(function (k) {
@@ -383,6 +445,12 @@ function object (obj) {
         this$1[k].on('change', function () {
           this$1.emit('change', this$1);
         });
+
+        if (serializable) {
+          this$1[k].on('serializable-change', function () {
+            this$1.emit('serializable-change', this$1);
+          });
+        }
       });
     }
 
@@ -393,13 +461,19 @@ function object (obj) {
     Obj.prototype.serialize = function serialize () {
       var this$1 = this;
 
-      var res = {
-        id: this.id
-      };
-      keys.forEach(function (k) {
-        res[k] = this$1[k].serialize();
-      });
-      return res
+      if (serializable) {
+        var res = {
+          id: this.id
+        };
+        keys.forEach(function (k) {
+          if (this$1[k].serializable !== false) {
+            res[k] = this$1[k].serialize();
+          }
+        });
+        return res
+      } else {
+        throw new Error('This object is not serializable')
+      }
     };
 
     return Obj;
@@ -408,13 +482,13 @@ function object (obj) {
 
 Value.prototype.div = function (cls) {
   var selection = hx.div(cls).text(this.get());
-  this.on('change', function (evt) { return selection.text(evt.value); });
+  this.on('change', function (evt) { return selection.text(evt); });
   return selection
 };
 
 Value.prototype.span = function (cls) {
   var selection = hx.span(cls).text(this.get());
-  this.on('change', function (evt) { return selection.text(evt.value); });
+  this.on('change', function (evt) { return selection.text(evt); });
   return selection
 };
 
@@ -423,16 +497,16 @@ Value.prototype.input = function (cls) {
 
   var selection = hx.detached('input').class(cls).value(this.get());
   selection.on('blur', function (evt) { return this$1.set(selection.value()); });
-  this.on('change', function (evt) { return selection.text(evt.value); });
+  this.on('change', function (evt) { return selection.text(evt); });
   return selection
 };
 
 Collection.prototype.div = function (cls, component) {
   var selection = hx.div(cls);
-  var components = new Map;
+  var components = new Map();
 
   function add (obj) {
-    var comp = component(obj);
+    var comp = component(obj, this);
     components.set(obj.id, comp);
     selection.add(comp);
   }
@@ -451,8 +525,8 @@ Collection.prototype.div = function (cls, component) {
   }
 
   this
-    .on('add', add)
-    .on('remove', remove)
+    .on('item-add', add)
+    .on('item-remove', remove)
     .on('set', set);
 
   set(this);

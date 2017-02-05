@@ -3,29 +3,29 @@ import { Value, Collection } from './objects'
 
 Value.prototype.div = function (cls) {
   const selection = hx.div(cls).text(this.get())
-  this.on('change', (evt) => selection.text(evt.value))
+  this.on('change', (evt) => selection.text(evt))
   return selection
 }
 
 Value.prototype.span = function (cls) {
   const selection = hx.span(cls).text(this.get())
-  this.on('change', (evt) => selection.text(evt.value))
+  this.on('change', (evt) => selection.text(evt))
   return selection
 }
 
 Value.prototype.input = function (cls) {
   const selection = hx.detached('input').class(cls).value(this.get())
   selection.on('blur', (evt) => this.set(selection.value()))
-  this.on('change', (evt) => selection.text(evt.value))
+  this.on('change', (evt) => selection.text(evt))
   return selection
 }
 
 Collection.prototype.div = function (cls, component) {
   const selection = hx.div(cls)
-  const components = new Map
+  const components = new Map()
 
   function add (obj) {
-    const comp = component(obj)
+    const comp = component(obj, this)
     components.set(obj.id, comp)
     selection.add(comp)
   }
@@ -44,8 +44,8 @@ Collection.prototype.div = function (cls, component) {
   }
 
   this
-    .on('add', add)
-    .on('remove', remove)
+    .on('item-add', add)
+    .on('item-remove', remove)
     .on('set', set)
 
   set(this)

@@ -110,7 +110,7 @@ describe('mutableCollection', () => {
     instance.on('change', (evt) => {
       changeEvtEmitted = evt
     })
-    instance.on('add', (evt) => {
+    instance.on('item-add', (evt) => {
       addEvtEmitted = evt
     })
     instance.add(p)
@@ -129,7 +129,7 @@ describe('mutableCollection', () => {
     instance.on('change', (evt) => {
       changeEvtEmitted = evt
     })
-    instance.on('remove', (evt) => {
+    instance.on('item-remove', (evt) => {
       removeEvtEmitted = evt
     })
     instance.remove(p)

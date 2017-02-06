@@ -57,8 +57,8 @@ function defaultForPrimitiveType (Type) {
 
 function typeFactory (Type) {
   return isPrimitiveType(Type) ?
-    (x) => x ? x : defaultForPrimitiveType(Type) :
-    (x) => x ? new Type(x) : new Type()
+    (x) => x !== undefined ? x : defaultForPrimitiveType(Type) :
+    (x) => x !== undefined ? new Type(x) : new Type()
 }
 
 class Observable extends EventEmitter {}
@@ -73,7 +73,7 @@ function constant (Type, options = {}) {
   return class Constant extends Value {
     constructor (value) {
       super();
-      this.value = create(value || defaultValue());
+      this.value = create(value !== undefined ? value : defaultValue());
       this.serializable = serializable;
     }
 
@@ -103,7 +103,7 @@ function mutable (Type, options = {}) {
   return class Mutable extends Value {
     constructor (value) {
       super();
-      this.value = create(value || defaultValue());
+      this.value = create(value !== undefined ? value : defaultValue());
       this.serializable = serializable;
     }
 

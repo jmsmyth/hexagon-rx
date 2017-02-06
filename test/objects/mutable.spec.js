@@ -23,6 +23,19 @@ describe('mutable', () => {
     instance.get().should.equal(5)
   })
 
+  it('should initialise to 0', () => {
+    const Mutable = mutable(Number)
+    const instance = new Mutable(0)
+    instance.get().should.equal(0)
+  })
+
+  it('should initialise to ""', () => {
+    const Mutable = mutable(String)
+    const instance = new Mutable("")
+    instance.get().should.equal("")
+  })
+
+
   it('should initialise to the default if provided', () => {
     const Mutable = mutable(Number, { default: 10 })
     const instance = new Mutable()

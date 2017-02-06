@@ -61,8 +61,8 @@ function defaultForPrimitiveType (Type) {
 
 function typeFactory (Type) {
   return isPrimitiveType(Type) ?
-    function (x) { return x ? x : defaultForPrimitiveType(Type); } :
-    function (x) { return x ? new Type(x) : new Type(); }
+    function (x) { return x !== undefined ? x : defaultForPrimitiveType(Type); } :
+    function (x) { return x !== undefined ? new Type(x) : new Type(); }
 }
 
 var Observable = (function (EventEmitter$$1) {
@@ -109,7 +109,7 @@ function constant (Type, options) {
   return (function (Value) {
     function Constant (value) {
       Value.call(this);
-      this.value = create(value || defaultValue());
+      this.value = create(value !== undefined ? value : defaultValue());
       this.serializable = serializable;
     }
 
@@ -147,7 +147,7 @@ function mutable (Type, options) {
   return (function (Value) {
     function Mutable (value) {
       Value.call(this);
-      this.value = create(value || defaultValue());
+      this.value = create(value !== undefined ? value : defaultValue());
       this.serializable = serializable;
     }
 

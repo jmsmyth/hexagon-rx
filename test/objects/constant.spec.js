@@ -23,6 +23,18 @@ describe('constant', () => {
     instance.get().should.equal(5)
   })
 
+  it('should initialise to 0', () => {
+    const Constant = constant(Number)
+    const instance = new Constant(0)
+    instance.get().should.equal(0)
+  })
+
+  it('should initialise to ""', () => {
+    const Constant = constant(String)
+    const instance = new Constant("")
+    instance.get().should.equal("")
+  })
+
   it('should initialise to the default if provided', () => {
     const Constant = constant(Number, { default: 10 })
     const instance = new Constant()

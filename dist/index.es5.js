@@ -18,10 +18,10 @@ var EventEmitter = function EventEmitter () {
   this.listeners = new Map;
 };
 
-EventEmitter.prototype.emit = function emit (name, evt) {
+EventEmitter.prototype.emit = function emit (name, evt, meta) {
   var listeners = this.listeners.get(name);
   if (listeners) {
-    listeners.forEach(function (listener) { return listener(evt); });
+    listeners.forEach(function (listener) { return listener(evt, meta); });
   }
   return this
 };
@@ -73,11 +73,21 @@ var Observable = (function (EventEmitter$$1) {
 var Value = (function (Observable) {
   function Value () {
     Observable.apply(this, arguments);
-  }if ( Observable ) Value.__proto__ = Observable;
+  }
+
+  if ( Observable ) Value.__proto__ = Observable;
   Value.prototype = Object.create( Observable && Observable.prototype );
   Value.prototype.constructor = Value;
 
-  
+  Value.prototype.map = function map (f) {
+    if (f instanceof Value) {
+      throw new Error('Mapping over Values is not yet supported')
+    } else if (isFunction(f)) {
+      return new MappedValue(this, f)
+    } else {
+      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+    }
+  };
 
   return Value;
 }(Observable));
@@ -92,6 +102,40 @@ var Collection = (function (Observable) {
 
   return Collection;
 }(Observable));
+
+var MappedValue = (function (Value) {
+  function MappedValue(originalValue, f) {
+    var this$1 = this;
+
+    Value.call(this);
+    this.originalValue = originalValue;
+    this.f = f;
+    this.originalValue.on('change', function (value, meta) {
+      this$1.emit('change', this$1.f(value), meta);
+    });
+    this.originalValue.on('serializable-change', function (value, meta) {
+      this$1.emit('serializable-change', this$1.f(value), meta);
+    });
+  }
+
+  if ( Value ) MappedValue.__proto__ = Value;
+  MappedValue.prototype = Object.create( Value && Value.prototype );
+  MappedValue.prototype.constructor = MappedValue;
+
+  MappedValue.prototype.get = function get () {
+    return this.f(this.originalValue.get())
+  };
+
+  MappedValue.prototype.set = function set () {
+    throw new Error('A MappedValue cannot be assigned to')
+  };
+
+  MappedValue.prototype.serialize = function serialize () {
+    return this.f(this.originalValue.serialize())
+  };
+
+  return MappedValue;
+}(Value));
 
 function constant (Type, options) {
   if ( options === void 0 ) options = {};
@@ -153,11 +197,11 @@ function mutable (Type, options) {
       return this.value
     };
 
-    Mutable.prototype.set = function set (value) {
+    Mutable.prototype.set = function set (value, eventMeta) {
       if (this.value !== value) {
         this.value = value;
-        this.emit('change', value);
-        if (serializable) { this.emit('serializable-change', value); }
+        this.emit('change', value, eventMeta);
+        if (serializable) { this.emit('serializable-change', value, eventMeta); }
       }
     };
 
@@ -254,18 +298,18 @@ function mutableCollection (Type, options) {
       var initialValue = values || defaultValue() || [];
       initialValue.forEach(function (v) {
         var t = new Type(v);
-        var changeListener = function (evt) {
-          this$1.emit('item-change', evt);
-          this$1.emit('change', this$1);
+        var changeListener = function (evt, eventMeta) {
+          this$1.emit('item-change', evt, eventMeta);
+          this$1.emit('change', this$1, eventMeta);
         };
         t.on('change', changeListener);
         this$1.map.set(t.id, t);
         this$1.listeners.set(t.id, changeListener);
 
         if (serializable) {
-          var serializableChangeListener = function (evt) {
-            this$1.emit('item-serializable-change', evt);
-            this$1.emit('serializable-change', this$1);
+          var serializableChangeListener = function (evt, eventMeta) {
+            this$1.emit('item-serializable-change', evt, eventMeta);
+            this$1.emit('serializable-change', this$1, eventMeta);
           };
           this$1.serializableListeners.set(t.id, serializableChangeListener);
           t.on('serializable-change', serializableChangeListener);
@@ -278,7 +322,7 @@ function mutableCollection (Type, options) {
     MutableCollection.prototype = Object.create( Collection && Collection.prototype );
     MutableCollection.prototype.constructor = MutableCollection;
 
-    MutableCollection.prototype.set = function set (values) {
+    MutableCollection.prototype.set = function set (values, eventMeta) {
       var this$1 = this;
 
       if (!Array.isArray(values)) {
@@ -293,28 +337,28 @@ function mutableCollection (Type, options) {
       oldValue.forEach(function (obj) { return this$1.listeners.delete(obj.id); });
       this.map = new Map();
       values.forEach(function (v) {
-        var changeListener = function (evt) {
-          this$1.emit('item-change', evt);
-          this$1.emit('change', this$1);
+        var changeListener = function (evt, eventMeta) {
+          this$1.emit('item-change', evt, eventMeta);
+          this$1.emit('change', this$1, eventMeta);
         };
         v.on('change', changeListener);
         this$1.map.set(v.id, v);
         this$1.listeners.set(v.id, changeListener);
 
         if (serializable) {
-          var serializableChangeListener = function (evt) {
-            this$1.emit('item-serializable-change', evt);
-            this$1.emit('serializable-change', this$1);
+          var serializableChangeListener = function (evt, eventMeta) {
+            this$1.emit('item-serializable-change', evt, eventMeta);
+            this$1.emit('serializable-change', this$1, eventMeta);
           };
           this$1.serializableListeners.set(v.id, serializableChangeListener);
           v.on('serializable-change', serializableChangeListener);
         }
       });
-      this.emit('set', this);
-      this.emit('change', this);
+      this.emit('set', this, eventMeta);
+      this.emit('change', this, eventMeta);
 
       if (serializable) {
-        this.emit('serializable-change', this);
+        this.emit('serializable-change', this, eventMeta);
       }
     };
 
@@ -326,31 +370,31 @@ function mutableCollection (Type, options) {
       }
     };
 
-    MutableCollection.prototype.add = function add (value) {
+    MutableCollection.prototype.add = function add (value, eventMeta) {
       var this$1 = this;
 
       var newValue = value !== undefined ? value : new Type();
 
       if (newValue instanceof Type) {
         if (!this.map.has(newValue.id)) {
-          var changeListener = function (evt) {
-            this$1.emit('item-change', evt);
-            this$1.emit('change', this$1);
+          var changeListener = function (evt, eventMeta) {
+            this$1.emit('item-change', evt, eventMeta);
+            this$1.emit('change', this$1, eventMeta);
           };
           newValue.on('change', changeListener);
           this.map.set(newValue.id, newValue);
           this.listeners.set(newValue.id, changeListener);
-          this.emit('item-add', newValue);
-          this.emit('change', this);
+          this.emit('item-add', newValue, eventMeta);
+          this.emit('change', this, eventMeta);
 
           if (serializable) {
-            var serializableChangeListener = function (evt) {
-              this$1.emit('item-serializable-change', evt);
-              this$1.emit('serializable-change', this$1);
+            var serializableChangeListener = function (evt, eventMeta) {
+              this$1.emit('item-serializable-change', evt, eventMeta);
+              this$1.emit('serializable-change', this$1, eventMeta);
             };
             this.serializableListeners.set(newValue.id, serializableChangeListener);
-            newValue.on('serializable-change', serializableChangeListener);
-            this.emit('serializable-change', this);
+            newValue.on('serializable-change', serializableChangeListener, eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           }
         }
       } else {
@@ -358,19 +402,19 @@ function mutableCollection (Type, options) {
       }
     };
 
-    MutableCollection.prototype.remove = function remove (value) {
+    MutableCollection.prototype.remove = function remove (value, eventMeta) {
       if (value instanceof Type) {
         if (this.map.has(value.id)) {
           var oldValue = this.map.get(value.id);
           oldValue.off('change', this.listeners.get(value.id));
           this.map.delete(value.id);
           this.listeners.delete(value.id);
-          this.emit('item-remove', value);
-          this.emit('change', this);
+          this.emit('item-remove', value, eventMeta);
+          this.emit('change', this, eventMeta);
 
           if (serializable) {
-            oldValue.off('serializable-change', this.serializableListeners.get(value.id));
-            this.emit('serializable-change', this);
+            oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           }
 
           oldValue;
@@ -442,13 +486,13 @@ function object (obj, options) {
         } else {
           this$1[k] = new Type();
         }
-        this$1[k].on('change', function () {
-          this$1.emit('change', this$1);
+        this$1[k].on('change', function (v, eventMeta) {
+          this$1.emit('change', this$1, eventMeta);
         });
 
         if (serializable) {
-          this$1[k].on('serializable-change', function () {
-            this$1.emit('serializable-change', this$1);
+          this$1[k].on('serializable-change', function (v, eventMeta) {
+            this$1.emit('serializable-change', this$1, eventMeta);
           });
         }
       });

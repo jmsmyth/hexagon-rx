@@ -19,10 +19,10 @@ class EventEmitter {
     this.listeners = new Map;
   }
 
-  emit (name, evt) {
+  emit (name, evt, meta) {
     const listeners = this.listeners.get(name);
     if (listeners) {
-      listeners.forEach(listener => listener(evt));
+      listeners.forEach(listener => listener(evt, meta));
     }
     return this
   }
@@ -62,8 +62,44 @@ function typeFactory (Type) {
 }
 
 class Observable extends EventEmitter {}
-class Value extends Observable {}
+class Value extends Observable {
+  map (f) {
+    if (f instanceof Value) {
+      throw new Error('Mapping over Values is not yet supported')
+    } else if (isFunction(f)) {
+      return new MappedValue(this, f)
+    } else {
+      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+    }
+  }
+}
 class Collection extends Observable {}
+
+class MappedValue extends Value {
+  constructor(originalValue, f) {
+    super();
+    this.originalValue = originalValue;
+    this.f = f;
+    this.originalValue.on('change', (value, meta) => {
+      this.emit('change', this.f(value), meta);
+    });
+    this.originalValue.on('serializable-change', (value, meta) => {
+      this.emit('serializable-change', this.f(value), meta);
+    });
+  }
+
+  get () {
+    return this.f(this.originalValue.get())
+  }
+
+  set () {
+    throw new Error('A MappedValue cannot be assigned to')
+  }
+
+  serialize () {
+    return this.f(this.originalValue.serialize())
+  }
+}
 
 function constant (Type, options = {}) {
   const defaultValue = isFunction(options.default) ? options.default : () => options.default;
@@ -111,11 +147,11 @@ function mutable (Type, options = {}) {
       return this.value
     }
 
-    set (value) {
+    set (value, eventMeta) {
       if (this.value !== value) {
         this.value = value;
-        this.emit('change', value);
-        if (serializable) this.emit('serializable-change', value);
+        this.emit('change', value, eventMeta);
+        if (serializable) this.emit('serializable-change', value, eventMeta);
       }
     }
 
@@ -196,18 +232,18 @@ function mutableCollection (Type, options = {}) {
       const initialValue = values || defaultValue() || [];
       initialValue.forEach(v => {
         const t = new Type(v);
-        const changeListener = (evt) => {
-          this.emit('item-change', evt);
-          this.emit('change', this);
+        const changeListener = (evt, eventMeta) => {
+          this.emit('item-change', evt, eventMeta);
+          this.emit('change', this, eventMeta);
         };
         t.on('change', changeListener);
         this.map.set(t.id, t);
         this.listeners.set(t.id, changeListener);
 
         if (serializable) {
-          const serializableChangeListener = (evt) => {
-            this.emit('item-serializable-change', evt);
-            this.emit('serializable-change', this);
+          const serializableChangeListener = (evt, eventMeta) => {
+            this.emit('item-serializable-change', evt, eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           };
           this.serializableListeners.set(t.id, serializableChangeListener);
           t.on('serializable-change', serializableChangeListener);
@@ -216,7 +252,7 @@ function mutableCollection (Type, options = {}) {
       this.serializable = serializable;
     }
 
-    set (values) {
+    set (values, eventMeta) {
       if (!Array.isArray(values)) {
         throw new Error('The value passed into MutableCollection::set() should be an array')
       }
@@ -229,28 +265,28 @@ function mutableCollection (Type, options = {}) {
       oldValue.forEach(obj => this.listeners.delete(obj.id));
       this.map = new Map();
       values.forEach(v => {
-        const changeListener = (evt) => {
-          this.emit('item-change', evt);
-          this.emit('change', this);
+        const changeListener = (evt, eventMeta) => {
+          this.emit('item-change', evt, eventMeta);
+          this.emit('change', this, eventMeta);
         };
         v.on('change', changeListener);
         this.map.set(v.id, v);
         this.listeners.set(v.id, changeListener);
 
         if (serializable) {
-          const serializableChangeListener = (evt) => {
-            this.emit('item-serializable-change', evt);
-            this.emit('serializable-change', this);
+          const serializableChangeListener = (evt, eventMeta) => {
+            this.emit('item-serializable-change', evt, eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           };
           this.serializableListeners.set(v.id, serializableChangeListener);
           v.on('serializable-change', serializableChangeListener);
         }
       });
-      this.emit('set', this);
-      this.emit('change', this);
+      this.emit('set', this, eventMeta);
+      this.emit('change', this, eventMeta);
 
       if (serializable) {
-        this.emit('serializable-change', this);
+        this.emit('serializable-change', this, eventMeta);
       }
     }
 
@@ -262,29 +298,29 @@ function mutableCollection (Type, options = {}) {
       }
     }
 
-    add (value) {
+    add (value, eventMeta) {
       const newValue = value !== undefined ? value : new Type();
 
       if (newValue instanceof Type) {
         if (!this.map.has(newValue.id)) {
-          const changeListener = (evt) => {
-            this.emit('item-change', evt);
-            this.emit('change', this);
+          const changeListener = (evt, eventMeta) => {
+            this.emit('item-change', evt, eventMeta);
+            this.emit('change', this, eventMeta);
           };
           newValue.on('change', changeListener);
           this.map.set(newValue.id, newValue);
           this.listeners.set(newValue.id, changeListener);
-          this.emit('item-add', newValue);
-          this.emit('change', this);
+          this.emit('item-add', newValue, eventMeta);
+          this.emit('change', this, eventMeta);
 
           if (serializable) {
-            const serializableChangeListener = (evt) => {
-              this.emit('item-serializable-change', evt);
-              this.emit('serializable-change', this);
+            const serializableChangeListener = (evt, eventMeta) => {
+              this.emit('item-serializable-change', evt, eventMeta);
+              this.emit('serializable-change', this, eventMeta);
             };
             this.serializableListeners.set(newValue.id, serializableChangeListener);
-            newValue.on('serializable-change', serializableChangeListener);
-            this.emit('serializable-change', this);
+            newValue.on('serializable-change', serializableChangeListener, eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           }
         }
       } else {
@@ -292,19 +328,19 @@ function mutableCollection (Type, options = {}) {
       }
     }
 
-    remove (value) {
+    remove (value, eventMeta) {
       if (value instanceof Type) {
         if (this.map.has(value.id)) {
           const oldValue = this.map.get(value.id);
           oldValue.off('change', this.listeners.get(value.id));
           this.map.delete(value.id);
           this.listeners.delete(value.id);
-          this.emit('item-remove', value);
-          this.emit('change', this);
+          this.emit('item-remove', value, eventMeta);
+          this.emit('change', this, eventMeta);
 
           if (serializable) {
-            oldValue.off('serializable-change', this.serializableListeners.get(value.id));
-            this.emit('serializable-change', this);
+            oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           }
 
           oldValue;
@@ -359,13 +395,13 @@ function object (obj, options = {}) {
         } else {
           this[k] = new Type();
         }
-        this[k].on('change', () => {
-          this.emit('change', this);
+        this[k].on('change', (v, eventMeta) => {
+          this.emit('change', this, eventMeta);
         });
 
         if (serializable) {
-          this[k].on('serializable-change', () => {
-            this.emit('serializable-change', this);
+          this[k].on('serializable-change', (v, eventMeta) => {
+            this.emit('serializable-change', this, eventMeta);
           });
         }
       });

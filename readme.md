@@ -68,6 +68,6 @@ group.on('change', (group) => {
 
 hx.select('body')
   .add(group.div('group', personComponent)) // any changes to person will be instantly reflected here
-  .add(hx.button().text('Add').on('click', () => group.add(new Person)))
+  .add(hx.button().text('Add').on('click', () => group.add()))
 
 ```

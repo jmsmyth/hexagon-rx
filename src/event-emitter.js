@@ -4,10 +4,10 @@ export default class EventEmitter {
     this.listeners = new Map
   }
 
-  emit (name, evt) {
+  emit (name, evt, meta) {
     const listeners = this.listeners.get(name)
     if (listeners) {
-      listeners.forEach(listener => listener(evt))
+      listeners.forEach(listener => listener(evt, meta))
     }
     return this
   }

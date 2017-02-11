@@ -143,6 +143,12 @@ describe('mutableCollection', () => {
     const instance = new PointList([{id: 0, x: 5, y: 4}, {id: 1, x: 3, y: 10}])
     instance.serialize().should.eql([{id: 0, x: 5, y: 4}, {id: 1, x: 3, y: 10}])
   })
+
+  it('should throw an error when trying to serialize an unserializable', () => {
+    const PointList = mutableCollection(Point, {serializable: false})
+    const instance = new PointList([{id: 0, x: 5, y: 4}, {id: 1, x: 3, y: 10}])
+    should.throw(() => instance.serialize())
+  })
 })
 
 export default {}

@@ -78,6 +78,33 @@ describe('constant', () => {
     instance.serialize().should.equal(5)
   })
 
+  it('should throw an error when trying to serialize an unserializable', () => {
+    const Constant = constant(Number, {serializable: false})
+    const instance = new Constant(5)
+    should.throw(() => instance.serialize())
+  })
+
+  it('should map to a new Value', () => {
+    const Constant = constant(Number)
+    const instance = new Constant(5)
+    instance.map(x => x * 2).get().should.equal(10)
+    instance.map(x => x * 2).serialize().should.equal(10)
+  })
+
+  it('should not be serializable after mapping if the original value was not serializable', () => {
+    const Constant = constant(Number, {serializable: false})
+    const instance = new Constant(5)
+    instance.map(x => x * 2).get().should.equal(10)
+    should.throw(() => instance.map(x => x * 2).serialize())
+  })
+
+  it('should throw an error when trying to assign to a mapped value', () => {
+    const Constant = constant(Number)
+    const instance = new Constant(5)
+    const mapped = instance.map(x => x * 2)
+    should.throw(() => mapped.set(50))
+  })
+
 })
 
 export default {}

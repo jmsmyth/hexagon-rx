@@ -104,7 +104,7 @@ var Collection = (function (Observable) {
 }(Observable));
 
 var MappedValue = (function (Value) {
-  function MappedValue(originalValue, f) {
+  function MappedValue (originalValue, f) {
     var this$1 = this;
 
     Value.call(this);
@@ -306,14 +306,14 @@ function mutableCollection (Type, options) {
         this$1.map.set(t.id, t);
         this$1.listeners.set(t.id, changeListener);
 
-        if (serializable) {
-          var serializableChangeListener = function (evt, eventMeta) {
-            this$1.emit('item-serializable-change', evt, eventMeta);
+        var serializableChangeListener = function (evt, eventMeta) {
+          this$1.emit('item-serializable-change', evt, eventMeta);
+          if (serializable) {
             this$1.emit('serializable-change', this$1, eventMeta);
-          };
-          this$1.serializableListeners.set(t.id, serializableChangeListener);
-          t.on('serializable-change', serializableChangeListener);
-        }
+          }
+        };
+        this$1.serializableListeners.set(t.id, serializableChangeListener);
+        t.on('serializable-change', serializableChangeListener);
       });
       this.serializable = serializable;
     }
@@ -345,14 +345,14 @@ function mutableCollection (Type, options) {
         this$1.map.set(v.id, v);
         this$1.listeners.set(v.id, changeListener);
 
-        if (serializable) {
-          var serializableChangeListener = function (evt, eventMeta) {
-            this$1.emit('item-serializable-change', evt, eventMeta);
+        var serializableChangeListener = function (evt, eventMeta) {
+          this$1.emit('item-serializable-change', evt, eventMeta);
+          if (serializable) {
             this$1.emit('serializable-change', this$1, eventMeta);
-          };
-          this$1.serializableListeners.set(v.id, serializableChangeListener);
-          v.on('serializable-change', serializableChangeListener);
-        }
+          }
+        };
+        this$1.serializableListeners.set(v.id, serializableChangeListener);
+        v.on('serializable-change', serializableChangeListener);
       });
       this.emit('set', this, eventMeta);
       this.emit('change', this, eventMeta);
@@ -387,15 +387,15 @@ function mutableCollection (Type, options) {
           this.emit('item-add', newValue, eventMeta);
           this.emit('change', this, eventMeta);
 
-          if (serializable) {
-            var serializableChangeListener = function (evt, eventMeta) {
-              this$1.emit('item-serializable-change', evt, eventMeta);
+          var serializableChangeListener = function (evt, eventMeta) {
+            this$1.emit('item-serializable-change', evt, eventMeta);
+            if (serializable) {
               this$1.emit('serializable-change', this$1, eventMeta);
-            };
-            this.serializableListeners.set(newValue.id, serializableChangeListener);
-            newValue.on('serializable-change', serializableChangeListener, eventMeta);
-            this.emit('serializable-change', this, eventMeta);
-          }
+            }
+          };
+          this.serializableListeners.set(newValue.id, serializableChangeListener);
+          newValue.on('serializable-change', serializableChangeListener, eventMeta);
+          this.emit('serializable-change', this, eventMeta);
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
@@ -412,8 +412,9 @@ function mutableCollection (Type, options) {
           this.emit('item-remove', value, eventMeta);
           this.emit('change', this, eventMeta);
 
+          oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
+
           if (serializable) {
-            oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
             this.emit('serializable-change', this, eventMeta);
           }
 
@@ -461,7 +462,6 @@ var RXObject = (function (Observable) {
 
 function object (obj, options) {
   if ( options === void 0 ) options = {};
-
 
   var serializable = options.serializable !== false;
   var keys = Object.keys(obj);

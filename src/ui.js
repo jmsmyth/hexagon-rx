@@ -53,4 +53,32 @@ Collection.prototype.div = function (cls, component) {
   return selection
 }
 
+const originalClassed = hx.Selection.prototype.classed
+hx.Selection.prototype.classed = function (cls, include) {
+
+  if (include instanceof Value) {
+    const onChange = (inc) => {
+      originalClassed.call(this, cls, inc)
+    }
+
+    this.nodes.forEach(node => {
+
+      node.__hxrx__ = node.__hxrx__ || {}
+
+      if (node.__hxrx__.classedValue && node.__hxrx__.classedChangeCallback) {
+        node.__hxrx__.classedValue.off('change', node.__hxrx__.classedChangeCallback)
+      }
+
+      node.__hxrx__.classedValue = include
+      node.__hxrx__.classedChangeCallback = onChange
+
+      include.on('change', onChange)
+    })
+
+    return originalClassed.call(this, cls, include.get())
+  } else {
+    return originalClassed.apply(this, arguments)
+  }
+}
+
 export default {}

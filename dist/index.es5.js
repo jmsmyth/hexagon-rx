@@ -115,7 +115,7 @@ var Collection = (function (Observable) {
 }(Observable));
 
 var MappedValue = (function (Value) {
-  function MappedValue(originalValue, f) {
+  function MappedValue (originalValue, f) {
     var this$1 = this;
 
     Value.call(this);
@@ -317,14 +317,14 @@ function mutableCollection (Type, options) {
         this$1.valuesMap.set(t.id, t);
         this$1.listeners.set(t.id, changeListener);
 
-        if (serializable) {
-          var serializableChangeListener = function (evt, eventMeta) {
-            this$1.emit('item-serializable-change', evt, eventMeta);
-            this$1.emit('serializable-change', this$1.get(), eventMeta);
-          };
-          this$1.serializableListeners.set(t.id, serializableChangeListener);
-          t.on('serializable-change', serializableChangeListener);
-        }
+        var serializableChangeListener = function (evt, eventMeta) {
+          this$1.emit('item-serializable-change', evt, eventMeta);
+          if (serializable) {
+            this$1.emit('serializable-change', this$1, eventMeta);
+          }
+        };
+        this$1.serializableListeners.set(t.id, serializableChangeListener);
+        t.on('serializable-change', serializableChangeListener);
       });
       this.serializable = serializable;
     }
@@ -356,14 +356,14 @@ function mutableCollection (Type, options) {
         this$1.valuesMap.set(v.id, v);
         this$1.listeners.set(v.id, changeListener);
 
-        if (serializable) {
-          var serializableChangeListener = function (evt, eventMeta) {
-            this$1.emit('item-serializable-change', evt, eventMeta);
-            this$1.emit('serializable-change', this$1.get(), eventMeta);
-          };
-          this$1.serializableListeners.set(v.id, serializableChangeListener);
-          v.on('serializable-change', serializableChangeListener);
-        }
+        var serializableChangeListener = function (evt, eventMeta) {
+          this$1.emit('item-serializable-change', evt, eventMeta);
+          if (serializable) {
+            this$1.emit('serializable-change', this$1, eventMeta);
+          }
+        };
+        this$1.serializableListeners.set(v.id, serializableChangeListener);
+        v.on('serializable-change', serializableChangeListener);
       });
       this.emit('set', this.get(), eventMeta);
       this.emit('change', this.get(), eventMeta);
@@ -398,15 +398,15 @@ function mutableCollection (Type, options) {
           this.emit('item-add', newValue, eventMeta);
           this.emit('change', this.get(), eventMeta);
 
-          if (serializable) {
-            var serializableChangeListener = function (evt, eventMeta) {
-              this$1.emit('item-serializable-change', evt, eventMeta);
-              this$1.emit('serializable-change', this$1.get(), eventMeta);
-            };
-            this.serializableListeners.set(newValue.id, serializableChangeListener);
-            newValue.on('serializable-change', serializableChangeListener, eventMeta);
-            this.emit('serializable-change', this.get(), eventMeta);
-          }
+          var serializableChangeListener = function (evt, eventMeta) {
+            this$1.emit('item-serializable-change', evt, eventMeta);
+            if (serializable) {
+              this$1.emit('serializable-change', this$1, eventMeta);
+            }
+          };
+          this.serializableListeners.set(newValue.id, serializableChangeListener);
+          newValue.on('serializable-change', serializableChangeListener, eventMeta);
+          this.emit('serializable-change', this, eventMeta);
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
@@ -423,9 +423,10 @@ function mutableCollection (Type, options) {
           this.emit('item-remove', value, eventMeta);
           this.emit('change', this.get(), eventMeta);
 
+          oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
+
           if (serializable) {
-            oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
-            this.emit('serializable-change', this.get(), eventMeta);
+            this.emit('serializable-change', this, eventMeta);
           }
 
           oldValue;
@@ -472,7 +473,6 @@ var RXObject = (function (Observable) {
 
 function object (obj, options) {
   if ( options === void 0 ) options = {};
-
 
   var serializable = options.serializable !== false;
   var keys = Object.keys(obj);
@@ -556,11 +556,9 @@ function oneof (spec) {
 
       if (objects.some(function (obj) { return value instanceof obj; })) {
         this.value = value;
-        this.id = this.value.id;
-        this.type = prototypeToName.get(value.constructor); //
+        this.type = prototypeToName.get(value.constructor);
       } else if (types.has(value.type)) {
         this.value = new (objects[value.type])[value.value];
-        this.id = this.value.id;
         this.type = value.type;
       } else {
         throw new Error("Wrong type passed into OneOf object")

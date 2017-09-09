@@ -5,5 +5,6 @@ export {
   mutable,
   constantCollection,
   mutableCollection,
-  object
+  object,
+  oneof
 } from './objects'

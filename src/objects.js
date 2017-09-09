@@ -31,7 +31,18 @@ export class Value extends Observable {
     }
   }
 }
-export class Collection extends Observable {}
+export class Collection extends Observable {
+  map (f) {
+    if (f instanceof Value) {
+      throw new Error('Mapping over Values is not yet supported')
+    } else if (isFunction(f)) {
+      // mapping over a collection turns it into a value
+      return new MappedValue(this, f)
+    } else {
+      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+    }
+  }
+}
 
 class MappedValue extends Value {
   constructor(originalValue, f) {
@@ -136,31 +147,31 @@ export function constantCollection (Type, options = {}) {
       super()
       const initialValue = values || defaultValue() || []
       this.values = initialValue.map(v => new Type(v))
-      this.map = new Map()
+      this.valuesMap = new Map()
       this.values.forEach(v => {
-        this.map.set(v.id, v)
+        this.valuesMap.set(v.id, v)
       })
       this.serializable = serializable
     }
 
     get (id) {
       if (arguments.length > 0) {
-        return this.map.get(id)
+        return this.valuesMap.get(id)
       } else {
         return this.values
       }
     }
 
     set () {
-      throw new Error('A constant collection cannot be changed to')
+      throw new Error('A constant collection cannot be modified')
     }
 
     add (obj) {
-      throw new Error('A constant collection cannot be changed to')
+      throw new Error('A constant collection cannot be modified')
     }
 
     remove (obj) {
-      throw new Error('A constant collection cannot be changed from')
+      throw new Error('A constant collection cannot be modified')
     }
 
     serialize () {
@@ -184,7 +195,7 @@ export function mutableCollection (Type, options = {}) {
   return class MutableCollection extends Collection {
     constructor (values) {
       super()
-      this.map = new Map()
+      this.valuesMap = new Map()
       this.listeners = new Map()
       this.serializableListeners = new Map()
       const initialValue = values || defaultValue() || []
@@ -192,16 +203,16 @@ export function mutableCollection (Type, options = {}) {
         const t = new Type(v)
         const changeListener = (evt, eventMeta) => {
           this.emit('item-change', evt, eventMeta)
-          this.emit('change', this, eventMeta)
+          this.emit('change', this.get(), eventMeta)
         }
         t.on('change', changeListener)
-        this.map.set(t.id, t)
+        this.valuesMap.set(t.id, t)
         this.listeners.set(t.id, changeListener)
 
         if (serializable) {
           const serializableChangeListener = (evt, eventMeta) => {
             this.emit('item-serializable-change', evt, eventMeta)
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
           this.serializableListeners.set(t.id, serializableChangeListener)
           t.on('serializable-change', serializableChangeListener)
@@ -221,38 +232,38 @@ export function mutableCollection (Type, options = {}) {
 
       const oldValue = this.get()
       oldValue.forEach(obj => this.listeners.delete(obj.id))
-      this.map = new Map()
+      this.valuesMap = new Map()
       values.forEach(v => {
         const changeListener = (evt, eventMeta) => {
           this.emit('item-change', evt, eventMeta)
-          this.emit('change', this, eventMeta)
+          this.emit('change', this.get(), eventMeta)
         }
         v.on('change', changeListener)
-        this.map.set(v.id, v)
+        this.valuesMap.set(v.id, v)
         this.listeners.set(v.id, changeListener)
 
         if (serializable) {
           const serializableChangeListener = (evt, eventMeta) => {
             this.emit('item-serializable-change', evt, eventMeta)
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
           this.serializableListeners.set(v.id, serializableChangeListener)
           v.on('serializable-change', serializableChangeListener)
         }
       })
-      this.emit('set', this, eventMeta)
-      this.emit('change', this, eventMeta)
+      this.emit('set', this.get(), eventMeta)
+      this.emit('change', this.get(), eventMeta)
 
       if (serializable) {
-        this.emit('serializable-change', this, eventMeta)
+        this.emit('serializable-change', this.get(), eventMeta)
       }
     }
 
     get (id) {
       if (arguments.length > 0) {
-        return this.map.get(id)
+        return this.valuesMap.get(id)
       } else {
-        return Array.from(this.map.values())
+        return Array.from(this.valuesMap.values())
       }
     }
 
@@ -260,25 +271,25 @@ export function mutableCollection (Type, options = {}) {
       const newValue = value !== undefined ? value : new Type()
 
       if (newValue instanceof Type) {
-        if (!this.map.has(newValue.id)) {
+        if (!this.valuesMap.has(newValue.id)) {
           const changeListener = (evt, eventMeta) => {
             this.emit('item-change', evt, eventMeta)
-            this.emit('change', this, eventMeta)
+            this.emit('change', this.get(), eventMeta)
           }
           newValue.on('change', changeListener)
-          this.map.set(newValue.id, newValue)
+          this.valuesMap.set(newValue.id, newValue)
           this.listeners.set(newValue.id, changeListener)
           this.emit('item-add', newValue, eventMeta)
-          this.emit('change', this, eventMeta)
+          this.emit('change', this.get(), eventMeta)
 
           if (serializable) {
             const serializableChangeListener = (evt, eventMeta) => {
               this.emit('item-serializable-change', evt, eventMeta)
-              this.emit('serializable-change', this, eventMeta)
+              this.emit('serializable-change', this.get(), eventMeta)
             }
             this.serializableListeners.set(newValue.id, serializableChangeListener)
             newValue.on('serializable-change', serializableChangeListener, eventMeta)
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
         }
       } else {
@@ -288,17 +299,17 @@ export function mutableCollection (Type, options = {}) {
 
     remove (value, eventMeta) {
       if (value instanceof Type) {
-        if (this.map.has(value.id)) {
-          const oldValue = this.map.get(value.id)
+        if (this.valuesMap.has(value.id)) {
+          const oldValue = this.valuesMap.get(value.id)
           oldValue.off('change', this.listeners.get(value.id))
-          this.map.delete(value.id)
+          this.valuesMap.delete(value.id)
           this.listeners.delete(value.id)
           this.emit('item-remove', value, eventMeta)
-          this.emit('change', this, eventMeta)
+          this.emit('change', this.get(), eventMeta)
 
           if (serializable) {
             oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta)
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
 
           oldValue
@@ -378,6 +389,38 @@ export function object (obj, options = {}) {
         return res
       } else {
         throw new Error('This object is not serializable')
+      }
+    }
+  }
+}
+
+export function oneof (spec) {
+  const names = Object.keys(spec)
+  const objects = names.map(k => spec[k])
+  const types = new Set(names)
+  const prototypeToName = new Map(names.map(name => [objects[name], name]))
+
+  if (objects.some(obj => !(obj.prototype instanceof RXObject))) {
+    throw new Error("Non RXObject passed into oneof")
+  }
+
+  return class OneOf extends RXObject {
+    constructor (value) {
+      super()
+
+      if (objects.some(obj => value instanceof obj)) {
+        this.value = value
+      } else if (types.has(value.type)) {
+        this.value = new (objects[value.type])[value.value]
+      } else {
+        throw new Error("Wrong type passed into OneOf object")
+      }
+    }
+
+    serialize () {
+      return {
+        type: prototypeToName[this.value.constructor], //XXX: does not work
+        value: this.value.serialize()
       }
     }
   }

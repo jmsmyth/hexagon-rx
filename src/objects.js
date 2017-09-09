@@ -398,20 +398,27 @@ export function oneof (spec) {
   const names = Object.keys(spec)
   const objects = names.map(k => spec[k])
   const types = new Set(names)
-  const prototypeToName = new Map(names.map(name => [objects[name], name]))
+  const prototypeToName = new Map(names.map(name => [spec[name], name]))
+
+  const nameToPrototype = {}
+  names.forEach(name => {
+    nameToPrototype[name] = spec[name]
+  })
 
   if (objects.some(obj => !(obj.prototype instanceof RXObject))) {
     throw new Error("Non RXObject passed into oneof")
   }
 
-  return class OneOf extends RXObject {
+  class OneOf extends RXObject {
     constructor (value) {
       super()
 
       if (objects.some(obj => value instanceof obj)) {
         this.value = value
+        this.type = prototypeToName.get(value.constructor)
       } else if (types.has(value.type)) {
         this.value = new (objects[value.type])[value.value]
+        this.type = value.type
       } else {
         throw new Error("Wrong type passed into OneOf object")
       }
@@ -419,9 +426,13 @@ export function oneof (spec) {
 
     serialize () {
       return {
-        type: prototypeToName[this.value.constructor], //XXX: does not work
+        type: this.type,
         value: this.value.serialize()
       }
     }
   }
+
+  OneOf.types = nameToPrototype
+
+  return OneOf
 }

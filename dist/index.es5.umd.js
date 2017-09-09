@@ -100,11 +100,22 @@ var Value = (function (Observable) {
 var Collection = (function (Observable) {
   function Collection () {
     Observable.apply(this, arguments);
-  }if ( Observable ) Collection.__proto__ = Observable;
+  }
+
+  if ( Observable ) Collection.__proto__ = Observable;
   Collection.prototype = Object.create( Observable && Observable.prototype );
   Collection.prototype.constructor = Collection;
 
-  
+  Collection.prototype.map = function map (f) {
+    if (f instanceof Value) {
+      throw new Error('Mapping over Values is not yet supported')
+    } else if (isFunction(f)) {
+      // mapping over a collection turns it into a value
+      return new MappedValue(this, f)
+    } else {
+      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+    }
+  };
 
   return Collection;
 }(Observable));
@@ -240,9 +251,9 @@ function constantCollection (Type, options) {
       Collection.call(this);
       var initialValue = values || defaultValue() || [];
       this.values = initialValue.map(function (v) { return new Type(v); });
-      this.map = new Map();
+      this.valuesMap = new Map();
       this.values.forEach(function (v) {
-        this$1.map.set(v.id, v);
+        this$1.valuesMap.set(v.id, v);
       });
       this.serializable = serializable;
     }
@@ -253,22 +264,22 @@ function constantCollection (Type, options) {
 
     ConstantCollection.prototype.get = function get (id) {
       if (arguments.length > 0) {
-        return this.map.get(id)
+        return this.valuesMap.get(id)
       } else {
         return this.values
       }
     };
 
     ConstantCollection.prototype.set = function set () {
-      throw new Error('A constant collection cannot be changed to')
+      throw new Error('A constant collection cannot be modified')
     };
 
     ConstantCollection.prototype.add = function add (obj) {
-      throw new Error('A constant collection cannot be changed to')
+      throw new Error('A constant collection cannot be modified')
     };
 
     ConstantCollection.prototype.remove = function remove (obj) {
-      throw new Error('A constant collection cannot be changed from')
+      throw new Error('A constant collection cannot be modified')
     };
 
     ConstantCollection.prototype.serialize = function serialize () {
@@ -298,7 +309,7 @@ function mutableCollection (Type, options) {
       var this$1 = this;
 
       Collection.call(this);
-      this.map = new Map();
+      this.valuesMap = new Map();
       this.listeners = new Map();
       this.serializableListeners = new Map();
       var initialValue = values || defaultValue() || [];
@@ -306,16 +317,16 @@ function mutableCollection (Type, options) {
         var t = new Type(v);
         var changeListener = function (evt, eventMeta) {
           this$1.emit('item-change', evt, eventMeta);
-          this$1.emit('change', this$1, eventMeta);
+          this$1.emit('change', this$1.get(), eventMeta);
         };
         t.on('change', changeListener);
-        this$1.map.set(t.id, t);
+        this$1.valuesMap.set(t.id, t);
         this$1.listeners.set(t.id, changeListener);
 
         if (serializable) {
           var serializableChangeListener = function (evt, eventMeta) {
             this$1.emit('item-serializable-change', evt, eventMeta);
-            this$1.emit('serializable-change', this$1, eventMeta);
+            this$1.emit('serializable-change', this$1.get(), eventMeta);
           };
           this$1.serializableListeners.set(t.id, serializableChangeListener);
           t.on('serializable-change', serializableChangeListener);
@@ -341,38 +352,38 @@ function mutableCollection (Type, options) {
 
       var oldValue = this.get();
       oldValue.forEach(function (obj) { return this$1.listeners.delete(obj.id); });
-      this.map = new Map();
+      this.valuesMap = new Map();
       values.forEach(function (v) {
         var changeListener = function (evt, eventMeta) {
           this$1.emit('item-change', evt, eventMeta);
-          this$1.emit('change', this$1, eventMeta);
+          this$1.emit('change', this$1.get(), eventMeta);
         };
         v.on('change', changeListener);
-        this$1.map.set(v.id, v);
+        this$1.valuesMap.set(v.id, v);
         this$1.listeners.set(v.id, changeListener);
 
         if (serializable) {
           var serializableChangeListener = function (evt, eventMeta) {
             this$1.emit('item-serializable-change', evt, eventMeta);
-            this$1.emit('serializable-change', this$1, eventMeta);
+            this$1.emit('serializable-change', this$1.get(), eventMeta);
           };
           this$1.serializableListeners.set(v.id, serializableChangeListener);
           v.on('serializable-change', serializableChangeListener);
         }
       });
-      this.emit('set', this, eventMeta);
-      this.emit('change', this, eventMeta);
+      this.emit('set', this.get(), eventMeta);
+      this.emit('change', this.get(), eventMeta);
 
       if (serializable) {
-        this.emit('serializable-change', this, eventMeta);
+        this.emit('serializable-change', this.get(), eventMeta);
       }
     };
 
     MutableCollection.prototype.get = function get (id) {
       if (arguments.length > 0) {
-        return this.map.get(id)
+        return this.valuesMap.get(id)
       } else {
-        return Array.from(this.map.values())
+        return Array.from(this.valuesMap.values())
       }
     };
 
@@ -382,25 +393,25 @@ function mutableCollection (Type, options) {
       var newValue = value !== undefined ? value : new Type();
 
       if (newValue instanceof Type) {
-        if (!this.map.has(newValue.id)) {
+        if (!this.valuesMap.has(newValue.id)) {
           var changeListener = function (evt, eventMeta) {
             this$1.emit('item-change', evt, eventMeta);
-            this$1.emit('change', this$1, eventMeta);
+            this$1.emit('change', this$1.get(), eventMeta);
           };
           newValue.on('change', changeListener);
-          this.map.set(newValue.id, newValue);
+          this.valuesMap.set(newValue.id, newValue);
           this.listeners.set(newValue.id, changeListener);
           this.emit('item-add', newValue, eventMeta);
-          this.emit('change', this, eventMeta);
+          this.emit('change', this.get(), eventMeta);
 
           if (serializable) {
             var serializableChangeListener = function (evt, eventMeta) {
               this$1.emit('item-serializable-change', evt, eventMeta);
-              this$1.emit('serializable-change', this$1, eventMeta);
+              this$1.emit('serializable-change', this$1.get(), eventMeta);
             };
             this.serializableListeners.set(newValue.id, serializableChangeListener);
             newValue.on('serializable-change', serializableChangeListener, eventMeta);
-            this.emit('serializable-change', this, eventMeta);
+            this.emit('serializable-change', this.get(), eventMeta);
           }
         }
       } else {
@@ -410,17 +421,17 @@ function mutableCollection (Type, options) {
 
     MutableCollection.prototype.remove = function remove (value, eventMeta) {
       if (value instanceof Type) {
-        if (this.map.has(value.id)) {
-          var oldValue = this.map.get(value.id);
+        if (this.valuesMap.has(value.id)) {
+          var oldValue = this.valuesMap.get(value.id);
           oldValue.off('change', this.listeners.get(value.id));
-          this.map.delete(value.id);
+          this.valuesMap.delete(value.id);
           this.listeners.delete(value.id);
           this.emit('item-remove', value, eventMeta);
-          this.emit('change', this, eventMeta);
+          this.emit('change', this.get(), eventMeta);
 
           if (serializable) {
             oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
-            this.emit('serializable-change', this, eventMeta);
+            this.emit('serializable-change', this.get(), eventMeta);
           }
 
           oldValue;
@@ -530,6 +541,57 @@ function object (obj, options) {
   }(RXObject))
 }
 
+function oneof (spec) {
+  var names = Object.keys(spec);
+  var objects = names.map(function (k) { return spec[k]; });
+  var types = new Set(names);
+  var prototypeToName = new Map(names.map(function (name) { return [spec[name], name]; }));
+
+  var nameToPrototype = {};
+  names.forEach(function (name) {
+    nameToPrototype[name] = spec[name];
+  });
+
+  if (objects.some(function (obj) { return !(obj.prototype instanceof RXObject); })) {
+    throw new Error("Non RXObject passed into oneof")
+  }
+
+  var OneOf = (function (RXObject) {
+    function OneOf (value) {
+      RXObject.call(this);
+
+      if (objects.some(function (obj) { return value instanceof obj; })) {
+        this.value = value;
+        this.id = this.value.id;
+        this.type = prototypeToName.get(value.constructor); //
+      } else if (types.has(value.type)) {
+        this.value = new (objects[value.type])[value.value];
+        this.id = this.value.id;
+        this.type = value.type;
+      } else {
+        throw new Error("Wrong type passed into OneOf object")
+      }
+    }
+
+    if ( RXObject ) OneOf.__proto__ = RXObject;
+    OneOf.prototype = Object.create( RXObject && RXObject.prototype );
+    OneOf.prototype.constructor = OneOf;
+
+    OneOf.prototype.serialize = function serialize () {
+      return {
+        type: this.type,
+        value: this.value.serialize()
+      }
+    };
+
+    return OneOf;
+  }(RXObject));
+
+  OneOf.types = nameToPrototype;
+
+  return OneOf
+}
+
 Value.prototype.div = function (cls) {
   var selection = hx.div(cls).text(this.get());
   this.on('change', function (evt) { return selection.text(evt); });
@@ -584,11 +646,42 @@ Collection.prototype.div = function (cls, component) {
   return selection
 };
 
+var originalClassed = hx.Selection.prototype.classed;
+hx.Selection.prototype.classed = function (cls, include) {
+  var this$1 = this;
+
+
+  if (include instanceof Value) {
+    var onChange = function (inc) {
+      originalClassed.call(this$1, cls, inc);
+    };
+
+    this.nodes.forEach(function (node) {
+
+      node.__hxrx__ = node.__hxrx__ || {};
+
+      if (node.__hxrx__.classedValue && node.__hxrx__.classedChangeCallback) {
+        node.__hxrx__.classedValue.off('change', node.__hxrx__.classedChangeCallback);
+      }
+
+      node.__hxrx__.classedValue = include;
+      node.__hxrx__.classedChangeCallback = onChange;
+
+      include.on('change', onChange);
+    });
+
+    return originalClassed.call(this, cls, include.get())
+  } else {
+    return originalClassed.apply(this, arguments)
+  }
+};
+
 exports.constant = constant;
 exports.mutable = mutable;
 exports.constantCollection = constantCollection;
 exports.mutableCollection = mutableCollection;
 exports.object = object;
+exports.oneof = oneof;
 
 Object.defineProperty(exports, '__esModule', { value: true });
 

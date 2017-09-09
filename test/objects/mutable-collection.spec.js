@@ -84,7 +84,7 @@ describe('mutableCollection', () => {
     })
     instance.set([p])
     instance.get().should.eql([p])
-    evtEmitted.should.eql(instance)
+    evtEmitted.should.eql([p])
   })
 
   it('should throw an error if set to something other than an array', () => {
@@ -116,7 +116,7 @@ describe('mutableCollection', () => {
     instance.add(p)
     instance.get().should.eql([p])
     addEvtEmitted.should.eql(p)
-    changeEvtEmitted.should.eql(instance)
+    changeEvtEmitted.should.eql([p])
   })
 
   it('should be able to remove a value and should emit events', () => {
@@ -135,7 +135,7 @@ describe('mutableCollection', () => {
     instance.remove(p)
     instance.get().should.eql([])
     removeEvtEmitted.should.eql(p)
-    changeEvtEmitted.should.eql(instance)
+    changeEvtEmitted.should.eql([])
   })
 
   it('should serialize correctly', () => {
@@ -148,6 +148,12 @@ describe('mutableCollection', () => {
     const PointList = mutableCollection(Point, {serializable: false})
     const instance = new PointList([{id: 0, x: 5, y: 4}, {id: 1, x: 3, y: 10}])
     should.throw(() => instance.serialize())
+  })
+
+  it('should map to a new Value', () => {
+    const PointList = mutableCollection(Point, {serializable: false})
+    const instance = new PointList([{id: 0, x: 5, y: 4}, {id: 1, x: 3, y: 10}])
+    instance.map(x => x.length).get().should.equal(2)
   })
 })
 

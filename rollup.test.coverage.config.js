@@ -2,10 +2,12 @@ import buble from 'rollup-plugin-buble'
 import istanbul from 'rollup-plugin-istanbul'
 
 export default {
-  entry: 'test/index.spec.js',
-  dest: 'target/index.spec.coverage.js',
+  input: 'test/index.spec.js',
+  output: {
+    file: 'target/index.spec.coverage.js',
+    format: 'iife'
+  },
   external: ['hexagon-js', 'chai'],
-  format: 'iife',
   globals: {
     'hexagon-js': 'window.hx',
     'chai': 'window.chai'

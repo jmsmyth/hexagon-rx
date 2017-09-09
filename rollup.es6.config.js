@@ -1,7 +1,9 @@
 
 export default {
-  entry: 'src/index.js',
-  dest: 'dist/index.es6.js',
-  external: ['hexagon-js'],
-  format: 'es'
+  input: 'src/index.js',
+  output: {
+    file: 'dist/index.es6.js',
+    format: 'es'
+  },
+  external: ['hexagon-js']
 }

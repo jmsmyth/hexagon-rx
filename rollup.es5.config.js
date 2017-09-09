@@ -1,10 +1,12 @@
 import buble from 'rollup-plugin-buble'
 
 export default {
-  entry: 'src/index.js',
-  dest: 'dist/index.es5.js',
+  input: 'src/index.js',
+  output: {
+    file: 'dist/index.es5.js',
+    format: 'es'
+  },
   external: ['hexagon-js'],
-  format: 'es',
   plugins: [
     buble()
   ]

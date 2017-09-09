@@ -1,10 +1,12 @@
 import buble from 'rollup-plugin-buble'
 
 export default {
-  entry: 'test/index.spec.js',
-  dest: 'target/index.spec.js',
+  input: 'test/index.spec.js',
+  output: {
+    file: 'target/index.spec.js',
+    format: 'iife'
+  },
   external: ['hexagon-js', 'chai'],
-  format: 'iife',
   globals: {
     'hexagon-js': 'window.hx',
     'chai': 'window.chai'

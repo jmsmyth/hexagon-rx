@@ -1,11 +1,13 @@
 import buble from 'rollup-plugin-buble'
 
 export default {
-  entry: 'src/index.js',
-  dest: 'dist/index.es5.umd.js',
+  name: 'rx',
+  input: 'src/index.js',
+  output: {
+    file: 'dist/index.es5.umd.js',
+    format: 'umd'
+  },
   external: ['hexagon-js'],
-  moduleName: 'rx',
-  format: 'umd',
   plugins: [
     buble()
   ],

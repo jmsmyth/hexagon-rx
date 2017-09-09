@@ -1,10 +1,10 @@
 (function (global, factory) {
 	typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('hexagon-js')) :
 	typeof define === 'function' && define.amd ? define(['exports', 'hexagon-js'], factory) :
-	(factory((global.rx = global.rx || {}),global.window.hx));
+	(factory((global.rx = {}),global.window.hx));
 }(this, (function (exports,hx) { 'use strict';
 
-hx = 'default' in hx ? hx['default'] : hx;
+hx = hx && hx.hasOwnProperty('default') ? hx['default'] : hx;
 
 function isFunction (x) {
   return typeof x === "function";
@@ -435,7 +435,7 @@ function mutableCollection (Type, options) {
             this.emit('serializable-change', this, eventMeta);
           }
 
-          oldValue;
+          
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)

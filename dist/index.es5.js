@@ -429,7 +429,7 @@ function mutableCollection (Type, options) {
             this.emit('serializable-change', this, eventMeta);
           }
 
-          oldValue;
+          
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)

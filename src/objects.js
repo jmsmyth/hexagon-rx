@@ -14,9 +14,9 @@ function defaultForPrimitiveType (Type) {
 }
 
 function typeFactory (Type) {
-  return isPrimitiveType(Type) ?
-    (x) => x !== undefined ? x : defaultForPrimitiveType(Type) :
-    (x) => x !== undefined ? new Type(x) : new Type()
+  return isPrimitiveType(Type)
+    ? (x) => x !== undefined ? x : defaultForPrimitiveType(Type)
+    : (x) => x !== undefined ? new Type(x) : new Type()
 }
 
 export class Observable extends EventEmitter {}
@@ -47,6 +47,7 @@ export class Collection extends Observable {
 class MappedValue extends Value {
   constructor (originalValue, f) {
     super()
+    this._isMutable = false
     this.originalValue = originalValue
     this.f = f
     this.originalValue.on('change', (value, meta) => {
@@ -78,6 +79,7 @@ export function constant (Type, options = {}) {
   return class Constant extends Value {
     constructor (value) {
       super()
+      this._isMutable = false
       this.value = create(value !== undefined ? value : defaultValue())
       this.serializable = serializable
     }
@@ -108,6 +110,7 @@ export function mutable (Type, options = {}) {
   return class Mutable extends Value {
     constructor (value) {
       super()
+      this._isMutable = true
       this.value = create(value !== undefined ? value : defaultValue())
       this.serializable = serializable
     }
@@ -146,6 +149,7 @@ export function constantCollection (Type, options = {}) {
     constructor (values) {
       super()
       const initialValue = values || defaultValue() || []
+      this._isMutable = false
       this.values = initialValue.map(v => new Type(v))
       this.valuesMap = new Map()
       this.values.forEach(v => {
@@ -195,6 +199,7 @@ export function mutableCollection (Type, options = {}) {
   return class MutableCollection extends Collection {
     constructor (values) {
       super()
+      this._isMutable = true
       this.valuesMap = new Map()
       this.listeners = new Map()
       this.serializableListeners = new Map()
@@ -376,6 +381,14 @@ export function object (obj, options = {}) {
       })
     }
 
+    update (values) {
+      Object.keys(values).forEach(k => {
+        if (this[k] && this[k]._isMutable) {
+          this[k].set(values[k])
+        }
+      })
+    }
+
     serialize () {
       if (serializable) {
         const res = {
@@ -406,7 +419,7 @@ export function oneof (spec) {
   })
 
   if (objects.some(obj => !(obj.prototype instanceof RXObject))) {
-    throw new Error("Non RXObject passed into oneof")
+    throw new Error('Non RXObject passed into oneof')
   }
 
   class OneOf extends RXObject {
@@ -417,10 +430,10 @@ export function oneof (spec) {
         this.value = value
         this.type = prototypeToName.get(value.constructor)
       } else if (types.has(value.type)) {
-        this.value = new (objects[value.type])[value.value]
+        this.value = new (objects[value.type])[value.value]()
         this.type = value.type
       } else {
-        throw new Error("Wrong type passed into OneOf object")
+        throw new Error('Wrong type passed into OneOf object')
       }
     }
 

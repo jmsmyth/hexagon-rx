@@ -20,8 +20,8 @@
     "build:test-coverage": "rollup -c rollup.test.coverage.config.js",
     "prepare-release": "npm-run-all --parallel build:*"
   },
-  "devDependencies": {},
-  "dependencies": {
+  "dependencies": {},
+  "devDependencies": {
     "browser-test-runner": "^0.5.3",
     "chai": "^4.1.2",
     "mocha": "^3.5.0",

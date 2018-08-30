@@ -51,10 +51,10 @@ class MappedValue extends Value {
     this.originalValue = originalValue
     this.f = f
     this.originalValue.on('change', (value, meta) => {
-      this.emit('change', this.f(value), meta)
+      this.emit('change', this.get(), meta)
     })
     this.originalValue.on('serializable-change', (value, meta) => {
-      this.emit('serializable-change', this.f(value), meta)
+      this.emit('serializable-change', this.get(), meta)
     })
   }
 
@@ -217,7 +217,7 @@ export function mutableCollection (Type, options = {}) {
         const serializableChangeListener = (evt, eventMeta) => {
           this.emit('item-serializable-change', evt, eventMeta)
           if (serializable) {
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
         }
         this.serializableListeners.set(t.id, serializableChangeListener)
@@ -250,7 +250,7 @@ export function mutableCollection (Type, options = {}) {
         const serializableChangeListener = (evt, eventMeta) => {
           this.emit('item-serializable-change', evt, eventMeta)
           if (serializable) {
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
         }
         this.serializableListeners.set(v.id, serializableChangeListener)
@@ -290,12 +290,12 @@ export function mutableCollection (Type, options = {}) {
           const serializableChangeListener = (evt, eventMeta) => {
             this.emit('item-serializable-change', evt, eventMeta)
             if (serializable) {
-              this.emit('serializable-change', this, eventMeta)
+              this.emit('serializable-change', this.get(), eventMeta)
             }
           }
           this.serializableListeners.set(newValue.id, serializableChangeListener)
           newValue.on('serializable-change', serializableChangeListener, eventMeta)
-          this.emit('serializable-change', this, eventMeta)
+          this.emit('serializable-change', this.get(), eventMeta)
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
@@ -315,13 +315,13 @@ export function mutableCollection (Type, options = {}) {
           oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta)
 
           if (serializable) {
-            this.emit('serializable-change', this, eventMeta)
+            this.emit('serializable-change', this.get(), eventMeta)
           }
 
           oldValue
         }
       } else {
-        throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
+        throw new Error('The object passed to MutableCollection::remove() does not have the expected type ' + Type)
       }
     }
 

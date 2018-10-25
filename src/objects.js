@@ -20,27 +20,26 @@ function typeFactory (Type) {
 }
 
 export class Observable extends EventEmitter {}
-export class Value extends Observable {
-  map (f) {
-    if (f instanceof Value) {
-      throw new Error('Mapping over Values is not yet supported')
-    } else if (isFunction(f)) {
-      return new MappedValue(this, f)
-    } else {
-      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
-    }
+export class Value extends Observable {}
+Value.prototype.map = function (f) {
+  if (f instanceof Value) {
+    throw new Error('Mapping over Values is not yet supported')
+  } else if (isFunction(f)) {
+    return new MappedValue(this, f)
+  } else {
+    throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
   }
 }
-export class Collection extends Observable {
-  map (f) {
-    if (f instanceof Value) {
-      throw new Error('Mapping over Values is not yet supported')
-    } else if (isFunction(f)) {
-      // mapping over a collection turns it into a value
-      return new MappedValue(this, f)
-    } else {
-      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
-    }
+
+export class Collection extends Observable {}
+Collection.prototype.map = function (f) {
+  if (f instanceof Value) {
+    throw new Error('Mapping over Values is not yet supported')
+  } else if (isFunction(f)) {
+    // mapping over a collection turns it into a value
+    return new MappedValue(this, f)
+  } else {
+    throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
   }
 }
 

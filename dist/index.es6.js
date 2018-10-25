@@ -1,4 +1,4 @@
-import hx from 'hexagon-js';
+import { div, span, detached, Selection } from 'hexagon-js';
 
 function isFunction (x) {
   return typeof x === "function";
@@ -56,46 +56,46 @@ function defaultForPrimitiveType (Type) {
 }
 
 function typeFactory (Type) {
-  return isPrimitiveType(Type) ?
-    (x) => x !== undefined ? x : defaultForPrimitiveType(Type) :
-    (x) => x !== undefined ? new Type(x) : new Type()
+  return isPrimitiveType(Type)
+    ? (x) => x !== undefined ? x : defaultForPrimitiveType(Type)
+    : (x) => x !== undefined ? new Type(x) : new Type()
 }
 
 class Observable extends EventEmitter {}
-class Value extends Observable {
-  map (f) {
-    if (f instanceof Value) {
-      throw new Error('Mapping over Values is not yet supported')
-    } else if (isFunction(f)) {
-      return new MappedValue(this, f)
-    } else {
-      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
-    }
+class Value extends Observable {}
+Value.prototype.map = function (f) {
+  if (f instanceof Value) {
+    throw new Error('Mapping over Values is not yet supported')
+  } else if (isFunction(f)) {
+    return new MappedValue(this, f)
+  } else {
+    throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
   }
-}
-class Collection extends Observable {
-  map (f) {
-    if (f instanceof Value) {
-      throw new Error('Mapping over Values is not yet supported')
-    } else if (isFunction(f)) {
-      // mapping over a collection turns it into a value
-      return new MappedValue(this, f)
-    } else {
-      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
-    }
+};
+
+class Collection extends Observable {}
+Collection.prototype.map = function (f) {
+  if (f instanceof Value) {
+    throw new Error('Mapping over Values is not yet supported')
+  } else if (isFunction(f)) {
+    // mapping over a collection turns it into a value
+    return new MappedValue(this, f)
+  } else {
+    throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
   }
-}
+};
 
 class MappedValue extends Value {
   constructor (originalValue, f) {
     super();
+    this._isMutable = false;
     this.originalValue = originalValue;
     this.f = f;
     this.originalValue.on('change', (value, meta) => {
-      this.emit('change', this.f(value), meta);
+      this.emit('change', this.get(), meta);
     });
     this.originalValue.on('serializable-change', (value, meta) => {
-      this.emit('serializable-change', this.f(value), meta);
+      this.emit('serializable-change', this.get(), meta);
     });
   }
 
@@ -120,6 +120,7 @@ function constant (Type, options = {}) {
   return class Constant extends Value {
     constructor (value) {
       super();
+      this._isMutable = false;
       this.value = create(value !== undefined ? value : defaultValue());
       this.serializable = serializable;
     }
@@ -150,6 +151,7 @@ function mutable (Type, options = {}) {
   return class Mutable extends Value {
     constructor (value) {
       super();
+      this._isMutable = true;
       this.value = create(value !== undefined ? value : defaultValue());
       this.serializable = serializable;
     }
@@ -188,6 +190,7 @@ function constantCollection (Type, options = {}) {
     constructor (values) {
       super();
       const initialValue = values || defaultValue() || [];
+      this._isMutable = false;
       this.values = initialValue.map(v => new Type(v));
       this.valuesMap = new Map();
       this.values.forEach(v => {
@@ -237,6 +240,7 @@ function mutableCollection (Type, options = {}) {
   return class MutableCollection extends Collection {
     constructor (values) {
       super();
+      this._isMutable = true;
       this.valuesMap = new Map();
       this.listeners = new Map();
       this.serializableListeners = new Map();
@@ -254,7 +258,7 @@ function mutableCollection (Type, options = {}) {
         const serializableChangeListener = (evt, eventMeta) => {
           this.emit('item-serializable-change', evt, eventMeta);
           if (serializable) {
-            this.emit('serializable-change', this, eventMeta);
+            this.emit('serializable-change', this.get(), eventMeta);
           }
         };
         this.serializableListeners.set(t.id, serializableChangeListener);
@@ -287,7 +291,7 @@ function mutableCollection (Type, options = {}) {
         const serializableChangeListener = (evt, eventMeta) => {
           this.emit('item-serializable-change', evt, eventMeta);
           if (serializable) {
-            this.emit('serializable-change', this, eventMeta);
+            this.emit('serializable-change', this.get(), eventMeta);
           }
         };
         this.serializableListeners.set(v.id, serializableChangeListener);
@@ -327,12 +331,12 @@ function mutableCollection (Type, options = {}) {
           const serializableChangeListener = (evt, eventMeta) => {
             this.emit('item-serializable-change', evt, eventMeta);
             if (serializable) {
-              this.emit('serializable-change', this, eventMeta);
+              this.emit('serializable-change', this.get(), eventMeta);
             }
           };
           this.serializableListeners.set(newValue.id, serializableChangeListener);
           newValue.on('serializable-change', serializableChangeListener, eventMeta);
-          this.emit('serializable-change', this, eventMeta);
+          this.emit('serializable-change', this.get(), eventMeta);
         }
       } else {
         throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
@@ -352,13 +356,11 @@ function mutableCollection (Type, options = {}) {
           oldValue.off('serializable-change', this.serializableListeners.get(value.id), eventMeta);
 
           if (serializable) {
-            this.emit('serializable-change', this, eventMeta);
+            this.emit('serializable-change', this.get(), eventMeta);
           }
-
-          
         }
       } else {
-        throw new Error('The object passed to MutableCollection::add() does not have the expected type ' + Type)
+        throw new Error('The object passed to MutableCollection::remove() does not have the expected type ' + Type)
       }
     }
 
@@ -418,6 +420,14 @@ function object (obj, options = {}) {
       });
     }
 
+    update (values) {
+      Object.keys(values).forEach(k => {
+        if (this[k] && this[k]._isMutable) {
+          this[k].set(values[k]);
+        }
+      });
+    }
+
     serialize () {
       if (serializable) {
         const res = {
@@ -448,7 +458,7 @@ function oneof (spec) {
   });
 
   if (objects.some(obj => !(obj.prototype instanceof RXObject))) {
-    throw new Error("Non RXObject passed into oneof")
+    throw new Error('Non RXObject passed into oneof')
   }
 
   class OneOf extends RXObject {
@@ -459,10 +469,10 @@ function oneof (spec) {
         this.value = value;
         this.type = prototypeToName.get(value.constructor);
       } else if (types.has(value.type)) {
-        this.value = new (objects[value.type])[value.value];
+        this.value = new (objects[value.type])[value.value]();
         this.type = value.type;
       } else {
-        throw new Error("Wrong type passed into OneOf object")
+        throw new Error('Wrong type passed into OneOf object')
       }
     }
 
@@ -480,30 +490,31 @@ function oneof (spec) {
 }
 
 Value.prototype.div = function (cls) {
-  const selection = hx.div(cls).text(this.get());
+  const selection = div(cls).text(this.get());
   this.on('change', (evt) => selection.text(evt));
   return selection
 };
 
 Value.prototype.span = function (cls) {
-  const selection = hx.span(cls).text(this.get());
+  const selection = span(cls).text(this.get());
   this.on('change', (evt) => selection.text(evt));
   return selection
 };
 
 Value.prototype.input = function (cls) {
-  const selection = hx.detached('input').class(cls).value(this.get());
+  const selection = detached('input').class(cls).value(this.get());
   selection.on('blur', (evt) => this.set(selection.value()));
   this.on('change', (evt) => selection.text(evt));
   return selection
 };
 
-Collection.prototype.div = function (cls, component) {
-  const selection = hx.div(cls);
+Collection.prototype.div = function (cls, component, options = {}) {
+  const selection = div(cls);
   const components = new Map();
+  const collection = this;
 
   function add (obj) {
-    const comp = component(obj, this);
+    const comp = component(obj, collection);
     components.set(obj.id, comp);
     selection.add(comp);
   }
@@ -531,24 +542,24 @@ Collection.prototype.div = function (cls, component) {
   return selection
 };
 
-const originalClassed = hx.Selection.prototype.classed;
-hx.Selection.prototype.classed = function (cls, include) {
-
+const originalClassed = Selection.prototype.classed;
+Selection.prototype.classed = function (cls, include) {
   if (include instanceof Value) {
-    const onChange = (inc) => {
-      originalClassed.call(this, cls, inc);
+    const onChange = () => {
+      originalClassed.call(this, cls, include.get());
     };
 
     this.nodes.forEach(node => {
-
       node.__hxrx__ = node.__hxrx__ || {};
+      node.__hxrx__.classedValue = node.__hxrx__.classedValue || {};
+      node.__hxrx__.classedChangeCallback = node.__hxrx__.classedChangeCallback || {};
 
-      if (node.__hxrx__.classedValue && node.__hxrx__.classedChangeCallback) {
-        node.__hxrx__.classedValue.off('change', node.__hxrx__.classedChangeCallback);
+      if (node.__hxrx__.classedValue[cls] && node.__hxrx__.classedChangeCallback[cls]) {
+        node.__hxrx__.classedValue[cls].off('change', node.__hxrx__.classedChangeCallback[cls]);
       }
 
-      node.__hxrx__.classedValue = include;
-      node.__hxrx__.classedChangeCallback = onChange;
+      node.__hxrx__.classedValue[cls] = include;
+      node.__hxrx__.classedChangeCallback[cls] = onChange;
 
       include.on('change', onChange);
     });

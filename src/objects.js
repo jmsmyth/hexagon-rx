@@ -398,8 +398,6 @@ export function mutableCollection (Type, options = {}) {
           if (serializable) {
             this.emit('serializable-change', this.get(), eventMeta)
           }
-
-          oldValue
         }
       } else {
         throw new Error('The object passed to MutableCollection::remove() does not have the expected type ' + Type)

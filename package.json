@@ -1,6 +1,6 @@
 {
   "name": "hexagon-rx",
-  "version": "0.4.0",
+  "version": "0.4.1",
   "description": "Reactive super powers for hexagon-js",
   "author": "James Smyth <jmsmyth@users.noreply.github.com>",
   "license": "MIT",

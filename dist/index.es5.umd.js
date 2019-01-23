@@ -1,8 +1,8 @@
 (function (global, factory) {
   typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports, require('hexagon-js')) :
   typeof define === 'function' && define.amd ? define(['exports', 'hexagon-js'], factory) :
-  (factory((global.rx = {}),global.window.hx));
-}(this, (function (exports,hexagonJs) { 'use strict';
+  (global = global || self, factory(global.rx = {}, global.window.hx));
+}(this, function (exports, hexagonJs) { 'use strict';
 
   function isFunction (x) {
     return typeof x === "function";
@@ -77,45 +77,58 @@
   var Value = /*@__PURE__*/(function (Observable) {
     function Value () {
       Observable.apply(this, arguments);
-    }if ( Observable ) Value.__proto__ = Observable;
+    }
+
+    if ( Observable ) Value.__proto__ = Observable;
     Value.prototype = Object.create( Observable && Observable.prototype );
     Value.prototype.constructor = Value;
 
-    
+    Value.prototype.map = function map (f) {
+      if (f instanceof Value) {
+        throw new Error('Mapping over Values is not yet supported')
+      } else if (isFunction(f)) {
+        return new MappedValue(this, f)
+      } else {
+        throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+      }
+    };
 
     return Value;
   }(Observable));
-  Value.prototype.map = function (f) {
-    if (f instanceof Value) {
-      throw new Error('Mapping over Values is not yet supported')
-    } else if (isFunction(f)) {
-      return new MappedValue(this, f)
-    } else {
-      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
-    }
-  };
 
   var Collection = /*@__PURE__*/(function (Observable) {
     function Collection () {
       Observable.apply(this, arguments);
-    }if ( Observable ) Collection.__proto__ = Observable;
+    }
+
+    if ( Observable ) Collection.__proto__ = Observable;
     Collection.prototype = Object.create( Observable && Observable.prototype );
     Collection.prototype.constructor = Collection;
 
-    
+    Collection.prototype.map = function map (f) {
+      if (f instanceof Value) {
+        throw new Error('Mapping over Values is not yet supported')
+      } else if (isFunction(f)) {
+      // mapping over a collection turns it into a value
+        return new MappedValue(this, f)
+      } else {
+        throw new Error('The argument passed to Collection::map(f) should be a function or a Value which contains a function')
+      }
+    };
+
+    Collection.prototype.filter = function filter (f) {
+      if (f instanceof Value) {
+        throw new Error('Filtering over Values is not yet supported')
+      } else if (isFunction(f)) {
+      // mapping over a collection turns it into a value
+        return new FilteredCollection(this, f)
+      } else {
+        throw new Error('The argument passed to Collection::filter(f) should be a function or a Value which contains a function')
+      }
+    };
 
     return Collection;
   }(Observable));
-  Collection.prototype.map = function (f) {
-    if (f instanceof Value) {
-      throw new Error('Mapping over Values is not yet supported')
-    } else if (isFunction(f)) {
-      // mapping over a collection turns it into a value
-      return new MappedValue(this, f)
-    } else {
-      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
-    }
-  };
 
   var MappedValue = /*@__PURE__*/(function (Value) {
     function MappedValue (originalValue, f) {
@@ -151,6 +164,85 @@
 
     return MappedValue;
   }(Value));
+
+  var FilteredCollection = /*@__PURE__*/(function (Collection) {
+    function FilteredCollection (originalValue, f) {
+      var this$1 = this;
+
+      Collection.call(this);
+      this._isMutable = false;
+      this.originalValue = originalValue;
+      this.f = f;
+      this._filteredItemsIds = new Set(this.get().map(function (d) { return d.id; }));
+
+      this.originalValue.on('item-change', function (value, meta) {
+        if (this$1.f(value)) {
+          if (this$1._filteredItemsIds.has(value.id)) {
+            this$1.emit('item-change', value, meta);
+            this$1.emit('change', this$1.get(), meta);
+          } else {
+            this$1._filteredItemsIds.add(value.id);
+            this$1.emit('item-add', value, meta);
+            this$1.emit('change', this$1.get(), meta);
+          }
+        } else {
+          if (this$1._filteredItemsIds.has(value.id)) {
+            this$1._filteredItemsIds.delete(value.id);
+            this$1.emit('item-remove', value, meta);
+            this$1.emit('change', this$1.get(), meta);
+          }
+        }
+      });
+      this.originalValue.on('item-serializable-change', function (value, meta) {
+        if (this$1.f(value)) {
+          this$1.emit('item-serializable-change', value, meta);
+          this$1.emit('serializable-change', this$1.get(), meta);
+        }
+      });
+      this.originalValue.on('item-add', function (value, meta) {
+        if (this$1.f(value)) {
+          this$1._filteredItemsIds.add(value.id);
+          this$1.emit('item-add', value, meta);
+          this$1.emit('change', this$1.get(), meta);
+        }
+      });
+      this.originalValue.on('item-remove', function (value, meta) {
+        if (this$1.f(value)) {
+          this$1._filteredItemsIds.delete(value.id);
+          this$1.emit('item-remove', value, meta);
+          this$1.emit('change', this$1.get(), meta);
+        }
+      });
+    }
+
+    if ( Collection ) FilteredCollection.__proto__ = Collection;
+    FilteredCollection.prototype = Object.create( Collection && Collection.prototype );
+    FilteredCollection.prototype.constructor = FilteredCollection;
+
+    FilteredCollection.prototype.get = function get () {
+      var this$1 = this;
+
+      return this.originalValue.get().filter(function (d) { return this$1.f(d); })
+    };
+
+    FilteredCollection.prototype.set = function set () {
+      throw new Error('A filtered collection cannot be modified')
+    };
+
+    FilteredCollection.prototype.add = function add (obj) {
+      throw new Error('A filtered collection cannot be modified')
+    };
+
+    FilteredCollection.prototype.remove = function remove (obj) {
+      throw new Error('A filtered collection cannot be modified')
+    };
+
+    FilteredCollection.prototype.serialize = function serialize () {
+      return this.get().map(function (v) { return v.serialize(); })
+    };
+
+    return FilteredCollection;
+  }(Collection));
 
   function constant (Type, options) {
     if ( options === void 0 ) options = {};
@@ -696,4 +788,4 @@
 
   Object.defineProperty(exports, '__esModule', { value: true });
 
-})));
+}));

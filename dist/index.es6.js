@@ -62,28 +62,41 @@ function typeFactory (Type) {
 }
 
 class Observable extends EventEmitter {}
-class Value extends Observable {}
-Value.prototype.map = function (f) {
-  if (f instanceof Value) {
-    throw new Error('Mapping over Values is not yet supported')
-  } else if (isFunction(f)) {
-    return new MappedValue(this, f)
-  } else {
-    throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+class Value extends Observable {
+  map (f) {
+    if (f instanceof Value) {
+      throw new Error('Mapping over Values is not yet supported')
+    } else if (isFunction(f)) {
+      return new MappedValue(this, f)
+    } else {
+      throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+    }
   }
-};
+}
 
-class Collection extends Observable {}
-Collection.prototype.map = function (f) {
-  if (f instanceof Value) {
-    throw new Error('Mapping over Values is not yet supported')
-  } else if (isFunction(f)) {
+class Collection extends Observable {
+  map (f) {
+    if (f instanceof Value) {
+      throw new Error('Mapping over Values is not yet supported')
+    } else if (isFunction(f)) {
     // mapping over a collection turns it into a value
-    return new MappedValue(this, f)
-  } else {
-    throw new Error('The argument passed to Value::map(f) should be a function or a Value which contains a function')
+      return new MappedValue(this, f)
+    } else {
+      throw new Error('The argument passed to Collection::map(f) should be a function or a Value which contains a function')
+    }
   }
-};
+
+  filter (f) {
+    if (f instanceof Value) {
+      throw new Error('Filtering over Values is not yet supported')
+    } else if (isFunction(f)) {
+    // mapping over a collection turns it into a value
+      return new FilteredCollection(this, f)
+    } else {
+      throw new Error('The argument passed to Collection::filter(f) should be a function or a Value which contains a function')
+    }
+  }
+}
 
 class MappedValue extends Value {
   constructor (originalValue, f) {
@@ -109,6 +122,75 @@ class MappedValue extends Value {
 
   serialize () {
     return this.f(this.originalValue.serialize())
+  }
+}
+
+class FilteredCollection extends Collection {
+  constructor (originalValue, f) {
+    super();
+    this._isMutable = false;
+    this.originalValue = originalValue;
+    this.f = f;
+    this._filteredItemsIds = new Set(this.get().map(d => d.id));
+
+    this.originalValue.on('item-change', (value, meta) => {
+      if (this.f(value)) {
+        if (this._filteredItemsIds.has(value.id)) {
+          this.emit('item-change', value, meta);
+          this.emit('change', this.get(), meta);
+        } else {
+          this._filteredItemsIds.add(value.id);
+          this.emit('item-add', value, meta);
+          this.emit('change', this.get(), meta);
+        }
+      } else {
+        if (this._filteredItemsIds.has(value.id)) {
+          this._filteredItemsIds.delete(value.id);
+          this.emit('item-remove', value, meta);
+          this.emit('change', this.get(), meta);
+        }
+      }
+    });
+    this.originalValue.on('item-serializable-change', (value, meta) => {
+      if (this.f(value)) {
+        this.emit('item-serializable-change', value, meta);
+        this.emit('serializable-change', this.get(), meta);
+      }
+    });
+    this.originalValue.on('item-add', (value, meta) => {
+      if (this.f(value)) {
+        this._filteredItemsIds.add(value.id);
+        this.emit('item-add', value, meta);
+        this.emit('change', this.get(), meta);
+      }
+    });
+    this.originalValue.on('item-remove', (value, meta) => {
+      if (this.f(value)) {
+        this._filteredItemsIds.delete(value.id);
+        this.emit('item-remove', value, meta);
+        this.emit('change', this.get(), meta);
+      }
+    });
+  }
+
+  get () {
+    return this.originalValue.get().filter(d => this.f(d))
+  }
+
+  set () {
+    throw new Error('A filtered collection cannot be modified')
+  }
+
+  add (obj) {
+    throw new Error('A filtered collection cannot be modified')
+  }
+
+  remove (obj) {
+    throw new Error('A filtered collection cannot be modified')
+  }
+
+  serialize () {
+    return this.get().map(v => v.serialize())
   }
 }
 

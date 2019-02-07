@@ -733,7 +733,7 @@
       }
     }
 
-    function set (collection) {
+    function set () {
       components.clear();
       selection.clear();
       collection.get().forEach(add);
@@ -744,7 +744,7 @@
       .on('item-remove', remove)
       .on('set', set);
 
-    set(this);
+    set();
 
     return selection
   };

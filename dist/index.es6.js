@@ -608,7 +608,7 @@ Collection.prototype.div = function (cls, component, options = {}) {
     }
   }
 
-  function set (collection) {
+  function set () {
     components.clear();
     selection.clear();
     collection.get().forEach(add);
@@ -619,7 +619,7 @@ Collection.prototype.div = function (cls, component, options = {}) {
     .on('item-remove', remove)
     .on('set', set);
 
-  set(this);
+  set();
 
   return selection
 };
